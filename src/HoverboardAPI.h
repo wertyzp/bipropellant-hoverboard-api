@@ -1,8 +1,7 @@
 #pragma once
 
 #include "hbprotocol/protocol.h"
-#include "Stream.h"
-
+#include "cstdio"
 class HoverboardAPI
 {
   public:
@@ -56,7 +55,7 @@ class HoverboardAPI
     double getSpeed1_mms();
 
     void resetCounters();
-    void printStats(Stream &Port);
+    void printStats(FILE *f);
 
 
     //available but not commonly used functions ********************************************************

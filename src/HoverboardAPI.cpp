@@ -7,7 +7,8 @@
 #include "hbprotocol/protocol_private.h"
 #include "protocolFunctions.h"
 #include <stdio.h>
-
+#include <unistd.h>
+#include <sys/time.h>
 
 
 /*Constructor (...)*********************************************************
@@ -22,11 +23,20 @@
  *
  ***************************************************************************/
 
-extern "C" {
-  extern void delay(uint32_t ms);
-  extern unsigned long millis(void);
+static unsigned long millis(void) {
+    static struct timeval start, end;
+    unsigned long mtime, seconds, useconds;    
+    gettimeofday(&start, NULL);
+    usleep(2000);
+    gettimeofday(&end, NULL);
+    seconds  = end.tv_sec  - start.tv_sec;
+    useconds = end.tv_usec - start.tv_usec;
+    mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
+    return mtime;
 }
 
+
+void delayWrapper(uint32_t ms) { usleep(ms*1000); }
 uint32_t tickWrapper(void) { return (uint32_t) millis(); }
 
 HoverboardAPI::HoverboardAPI(int (*send_serial_data)( unsigned char *data, int len )) {
@@ -38,7 +48,7 @@ HoverboardAPI::HoverboardAPI(int (*send_serial_data)( unsigned char *data, int l
 //  s.timeout1 = 50; //timeout for ACK
 //  s.timeout2 = 10; // timeout between characters
   protocol_GetTick = tickWrapper;
-  protocol_Delay = delay;
+  protocol_Delay = delayWrapper;
   setParamHandler(Codes::sensHall, NULL); // Disable callbacks for Hall
 }
 
@@ -91,7 +101,7 @@ int HoverboardAPI::updateParamVariable(Codes code, void *ptr, int len) {
 /***************************************************************************
  * Print Protocol Statistics. Remote Data has to be requested first.
  ***************************************************************************/
-void HoverboardAPI::printStats(Stream &port) {
+void HoverboardAPI::printStats(FILE *f) {
   char buffer [100];
   extern PROTOCOLCOUNT ProtocolcountData;
 
@@ -105,12 +115,12 @@ void HoverboardAPI::printStats(Stream &port) {
 */
 
   snprintf ( buffer, 100, "Local  RX: %4li TX: %4li RXmissing: %4li    ", s.ack.counters.rx + s.noack.counters.rx, s.ack.counters.tx + s.noack.counters.tx, s.ack.counters.rxMissing + s.noack.counters.rxMissing);
-  port.print(buffer);
+  fputs(buffer, f);
   snprintf ( buffer, 100, "Remote RX: %4li TX: %4li RXmissing: %4li    ",  ProtocolcountData.rx, ProtocolcountData.tx, ProtocolcountData.rxMissing);
-  port.print(buffer);
+  fputs(buffer, f);
   snprintf ( buffer, 100, "Missed Local->Remote %4li (%4li) Remote->Local %4li (%4li)", s.ack.counters.tx + s.noack.counters.tx - ProtocolcountData.rx, ProtocolcountData.rxMissing, ProtocolcountData.tx - s.ack.counters.rx - s.noack.counters.rx, s.ack.counters.rxMissing + s.noack.counters.rxMissing);
-  port.print(buffer);
-  port.println();
+  fputs(buffer, f);
+  fputs("\n", f);
 }
 
 
@@ -123,7 +133,7 @@ void HoverboardAPI::requestRead(Codes code, char som) {
 
     // Compose new Message, no ACK needed.
     PROTOCOL_MSG2 msg = {
-      .SOM = som,
+      .SOM = (unsigned char)som,
     };
 
     // Message structure is for reading values.
@@ -212,7 +222,7 @@ void HoverboardAPI::sendPWM(int16_t pwm, int16_t steer, char som) {
 
   // Compose new Message
   PROTOCOL_MSG2 msg = {
-    .SOM = som,
+    .SOM = (unsigned char)som,
   };
 
   // Prepare Message structure to write PWM values.
@@ -238,7 +248,7 @@ void HoverboardAPI::sendPWMData(int16_t pwm, int16_t steer, int speed_max_power,
 
   // Compose new Message
   PROTOCOL_MSG2 msg = {
-    .SOM = som,
+    .SOM = (unsigned char)som,
   };
 
   // Prepare Message structure to write PWM values.
@@ -268,7 +278,7 @@ void HoverboardAPI::sendBuzzer(uint8_t buzzerFreq, uint8_t buzzerPattern, uint16
 
   // Compose new Message
   PROTOCOL_MSG2 msg = {
-    .SOM = som,
+    .SOM = (unsigned char)som,
   };
 
   // Prepare Message structure to write buzzer values.
@@ -296,7 +306,7 @@ void HoverboardAPI::sendEnable(uint8_t newEnable, char som) {
 
   // Compose new Message
   PROTOCOL_MSG2 msg = {
-    .SOM = som,
+    .SOM = (unsigned char)som,
   };
 
   // Prepare Message structure to write buzzer values.
@@ -322,7 +332,7 @@ void HoverboardAPI::sendCounterReset(char som) {
 
   // Compose new Message
   PROTOCOL_MSG2 msg = {
-    .SOM = som,
+    .SOM = (unsigned char)som,
   };
 
   // Prepare Message structure to write buzzer values.
